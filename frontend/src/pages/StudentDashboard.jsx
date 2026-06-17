@@ -114,7 +114,7 @@ export default function StudentDashboard() {
             <hr className="my-4 border-slate-100" />
             <div className="space-y-3 text-xs font-medium text-slate-600">
               <div className="flex justify-between"><span className="text-slate-400">Student ID:</span> <span className="font-semibold text-slate-800">2024-00001</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Course Major:</span> <span className="font-semibold text-slate-800">BS Computer Science</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">Course Major:</span> <span className="font-semibold text-slate-800">BS Information Technology</span></div>
               <div className="flex justify-between"><span className="text-slate-400">Year Status:</span> <span className="font-semibold text-slate-800">3rd Year</span></div>
             </div>
           </div>

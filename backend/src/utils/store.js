@@ -33,7 +33,7 @@ async function seedDemoUsers() {
     mfaEnabled: false,
     mfaSecret: null,
     studentId: '2024-00001',
-    course: 'BS Computer Science',
+    course: 'BS Information Technology',
     yearLevel: '3rd Year',
   });
 }
