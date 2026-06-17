@@ -4,7 +4,6 @@ import Login from './pages/Login.jsx';
 import StudentDashboard from './pages/StudentDashboard.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
 
-// 🛡️ Security Check: Role-Based Route Guard Middleware
 function ProtectedRoute({ children, allowedRole }) {
   const { user, loading } = useAuth();
 
