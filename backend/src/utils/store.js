@@ -41,7 +41,7 @@ async function seedDemoUsers() {
 seedDemoUsers();
 
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 min
+const LOCKOUT_DURATION = 10 * 60 * 1000; 
 
 function getLoginAttempts(email) {
   const record = loginAttempts.get(email) || { count: 0, lockedUntil: null };
