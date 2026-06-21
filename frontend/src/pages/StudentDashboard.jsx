@@ -135,6 +135,12 @@ export default function StudentDashboard() {
 
     try {
       const response = await api.post('/auth/confirm-mfa', { code: mfaVerificationCode });
+
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        setUser(prev => ({ ...prev, mfaEnabled: true }));
+      }
+      
       setSuccess(response.data.message || 'MFA active!');
       setIsMfaActive(true);
       setMfaVerificationCode('');

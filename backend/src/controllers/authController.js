@@ -21,6 +21,7 @@ function generateToken(user, expiresIn = '30m') {
       email: user.email,
       role: user.role,
       name: user.name,
+      mfaEnabled: user.mfaEnabled || user.mfa_enabled || false,
       issuedAt: Date.now(),
     },
     JWT_SECRET,
@@ -123,6 +124,7 @@ async function login(req, res) {
       studentId: user.studentId || user.student_id,
       course: user.course,
       yearLevel: user.yearLevel || user.year_level,
+      mfaEnabled: user.mfaEnabled || user.mfa_enabled || false
     },
   });
 }
@@ -167,6 +169,7 @@ async function verifyMfa(req, res) {
       studentId: user.studentId || user.student_id,
       course: user.course,
       yearLevel: user.yearLevel || user.year_level,
+      mfaEnabled: user.mfaEnabled || user.mfa_enabled || false,
     },
   });
 }
@@ -213,8 +216,11 @@ async function confirmMfa(req, res) {
     if (u) { u.mfaEnabled = true; users.set(userEmail, u); }
   }
 
+  const updatedUser = { id: userId, email: userEmail, role: req.user.role, name: req.user.name, mfaEnabled: true };
+  const newToken = generateToken(updatedUser);
+
   await logActivity(userId, 'MFA_ENABLED', {});
-  res.json({ message: 'MFA enabled successfully.' });
+  res.json({ message: 'MFA enabled successfully.', token: newToken });
 }
 
 // POST /api/auth/logout

@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
         if (Date.now() >= payload.issuedAt + (30 * 60 * 1000)) {
           logout();
         } else {
-          setUser({ id: payload.id, name: payload.name, email: payload.email, role: payload.role });
+          setUser({ id: payload.id, name: payload.name, email: payload.email, role: payload.role, mfaEnabled: payload.mfaEnabled });
         }
       } catch {
         logout();
