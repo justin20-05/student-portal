@@ -92,10 +92,6 @@ async function login(req, res) {
   // Password valid — reset attempts
   resetLoginAttempts(normalizedEmail);
 
-  // Check MFA
-  const userMfaSecret = supabase
-    ? user.mfa_secret
-    : mfaSecrets.get(user.id);
 
   if (user.mfaEnabled || user.mfa_enabled) {
     // Issue temp token for MFA step
@@ -147,7 +143,7 @@ async function verifyMfa(req, res) {
   const user = await findUser(pending.email);
   if (!user) return res.status(401).json({ error: 'User not found.' });
 
-  const secret = supabase ? user.mfa_secret : mfaSecrets.get(user.id);
+  const secret = supabase ? user.mfa_secret : user.mfaSecret;
   const isValid = authenticator.verify({ token: code, secret });
 
   if (!isValid) {
