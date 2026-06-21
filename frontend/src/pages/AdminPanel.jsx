@@ -45,6 +45,14 @@ export default function AdminPanel() {
     }
   };
 
+  const formatLogTimestamp = (log) => {
+    const timestamp = log.timestamp ?? log.created_at ?? log.createdAt;
+    const date = new Date(timestamp);
+    return Number.isNaN(date.getTime()) ? 'Unknown timestamp' : date.toLocaleString();
+  };
+
+  const getLogValue = (log, camelKey, snakeKey) => log[camelKey] ?? log[snakeKey] ?? '';
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Admin Top Navigation Header - Now White with adjusted text colors */}
@@ -125,7 +133,7 @@ export default function AdminPanel() {
                   {logs.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-4 px-6 text-xs text-slate-500 font-mono font-medium">
-                        {new Date(log.timestamp).toLocaleString()}
+                        {formatLogTimestamp(log)}
                       </td>
                       <td className="py-4 px-6">
                         <span className={`px-2.5 py-1 text-[11px] font-bold rounded-md border shadow-sm ${getBadgeStyle(log.action)}`}>
@@ -133,15 +141,17 @@ export default function AdminPanel() {
                         </span>
                       </td>
                       <td className="py-4 px-6 font-mono text-xs font-bold text-slate-700">
-                        {log.userId || <span className="text-slate-400 italic font-medium">Anonymous/Public</span>}
+                        {getLogValue(log, 'userId', 'user_id') || <span className="text-slate-400 italic font-medium">Anonymous/Public</span>}
                       </td>
                       <td className="py-4 px-6 font-mono text-xs font-medium text-slate-500">
-                        {log.ip}
+                        {getLogValue(log, 'ip', 'ip_address')}
                       </td>
                       <td className="py-4 px-6">
                         {log.details && Object.keys(log.details).length > 0 ? (
                           <pre className="text-[11px] bg-slate-50 p-2 rounded-lg border border-slate-200 font-mono text-slate-700 max-w-xs overflow-x-auto shadow-inner">
-                            {JSON.stringify(log.details, null, 2)}
+                            {typeof log.details === 'string'
+                              ? log.details
+                              : JSON.stringify(log.details, null, 2)}
                           </pre>
                         ) : (
                           <span className="text-slate-400 text-xs italic font-medium">Empty context</span>
