@@ -219,6 +219,25 @@ async function confirmMfa(req, res) {
   res.json({ message: 'MFA enabled successfully.', token: newToken });
 }
 
+// POST /api/auth/disable-mfa
+async function disableMfa(req, res) {
+  const userId = req.user.id;
+  const userEmail = req.user.email;
+
+  if (supabase) {
+    await supabase.from('users').update({ mfa_enabled: false }).eq('id', userId);
+  } else {
+    const u = users.get(userEmail);
+    if (u) { u.mfaEnabled = false; users.set(userEmail, u); }
+  }
+
+  const updatedUser = { id: userId, email: userEmail, role: req.user.role, name: req.user.name, mfaEnabled: false };
+  const newToken = generateToken(updatedUser);
+
+  await logActivity(userId, 'MFA_DISABLED', {});
+  res.json({ message: 'MFA disabled successfully.', token: newToken });
+}
+
 // POST /api/auth/logout
 async function logout(req, res) {
   if (req.user) {
@@ -255,4 +274,4 @@ async function changePassword(req, res) {
   res.json({ message: 'Password changed successfully.' });
 }
 
-module.exports = { login, verifyMfa, setupMfa, confirmMfa, logout, changePassword };
+module.exports = { login, verifyMfa, setupMfa, confirmMfa, disableMfa, logout, changePassword };

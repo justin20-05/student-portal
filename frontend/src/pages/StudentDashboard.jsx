@@ -4,7 +4,7 @@ import api from '../utils/api';
 import logo from '../assets/Logo.jpg'; // Import the logo
 
 export default function StudentDashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, setUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -22,6 +22,9 @@ export default function StudentDashboard() {
   const [mfaSetupSecret, setMfaSetupSecret] = useState('');
   const [mfaVerificationCode, setMfaVerificationCode] = useState('');
   const [isMfaActive, setIsMfaActive] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showMfaActivatedModal, setShowMfaActivatedModal] = useState(false);
+  const [showMfaDeactivatedModal, setShowMfaDeactivatedModal] = useState(false);
 
   // Password Verification Logic State
   const [passwordValidations, setPasswordValidations] = useState({
@@ -138,10 +141,11 @@ export default function StudentDashboard() {
 
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
-        setUser(prev => ({ ...prev, mfaEnabled: true }));
+        setUser(prev => ({ ...(prev || {}), mfaEnabled: true }));
       }
       
       setSuccess(response.data.message || 'MFA active!');
+      setShowMfaActivatedModal(true);
       setIsMfaActive(true);
       setMfaVerificationCode('');
       setTimeout(() => setShowMfaModal(false), 2000);
@@ -150,9 +154,24 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleMfaToggle = () => {
+  const handleMfaToggle = async () => {
+    setError('');
+    setSuccess('');
+
     if (isMfaActive) {
-      setIsMfaActive(false); 
+      // Disable MFA on the server and update local state/token
+      try {
+        const response = await api.post('/auth/disable-mfa');
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+        }
+        setIsMfaActive(false);
+        setUser(prev => ({ ...(prev || {}), mfaEnabled: false }));
+        setSuccess(response.data.message || 'MFA disabled.');
+        setShowMfaDeactivatedModal(true);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to disable MFA.');
+      }
     } else {
       initiateMfaEnrollment();
     }
@@ -180,7 +199,7 @@ export default function StudentDashboard() {
             <p className="text-sm font-bold text-slate-800">{user?.name || 'Loading Student...'}</p>
             <p className="text-xs text-red-600 font-bold capitalize">{user?.role} Access Mode</p>
           </div>
-          <button onClick={logout} className="bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-900 text-xs font-bold px-4 py-2 rounded-lg transition border border-red-200 shadow-sm">
+          <button onClick={() => setShowLogoutConfirm(true)} className="bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-900 text-xs font-bold px-4 py-2 rounded-lg transition border border-red-200 shadow-sm">
             Log Out
           </button>
         </div>
@@ -342,6 +361,50 @@ export default function StudentDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* LOGOUT CONFIRMATION MODAL */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl p-6 border border-slate-200">
+            <h3 className="text-lg font-black text-slate-900 mb-2">Confirm Sign Out</h3>
+            <p className="text-sm text-slate-600 mb-4">Are you sure you want to log out? You will need to sign in again to continue.</p>
+            <div className="flex space-x-3 mt-4">
+              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2.5 text-xs font-bold bg-slate-200 text-slate-800 rounded-lg">Cancel</button>
+              <button onClick={() => { setShowLogoutConfirm(false); logout(); }} className="flex-1 py-2.5 text-xs font-bold bg-red-600 text-white rounded-lg">Sign Out</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MFA ACTIVATED MODAL */}
+      {showMfaActivatedModal && (
+        <div className="fixed inset-0 bg-slate-900/40 flex items-end justify-center p-6 z-50">
+          <div className="bg-emerald-600 text-white max-w-sm w-full rounded-2xl shadow-2xl p-4 border border-emerald-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold">Multi-Factor Activated</h4>
+                <p className="text-[13px] opacity-90">Your account now requires an authenticator code for future sign-ins.</p>
+              </div>
+              <button onClick={() => setShowMfaActivatedModal(false)} className="ml-4 text-sm font-bold uppercase opacity-90">Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MFA DEACTIVATED MODAL */}
+      {showMfaDeactivatedModal && (
+        <div className="fixed inset-0 bg-slate-900/40 flex items-end justify-center p-6 z-50">
+          <div className="bg-red-600 text-white max-w-sm w-full rounded-2xl shadow-2xl p-4 border border-red-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold">Multi-Factor Disabled</h4>
+                <p className="text-[13px] opacity-90">MFA has been turned off for your account. Consider re-enabling for added security.</p>
+              </div>
+              <button onClick={() => setShowMfaDeactivatedModal(false)} className="ml-4 text-sm font-bold uppercase opacity-90">Dismiss</button>
+            </div>
           </div>
         </div>
       )}

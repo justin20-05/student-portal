@@ -10,6 +10,7 @@ router.post('/verify-mfa', authController.verifyMfa);
 // Protected auth routes (Require active authentication)
 router.post('/setup-mfa', authenticate, authController.setupMfa);
 router.post('/confirm-mfa', authenticate, authController.confirmMfa);
+router.post('/disable-mfa', authenticate, authController.disableMfa);
 router.post('/change-password', authenticate, authController.changePassword);
 router.post('/logout', authenticate, authController.logout);
 
