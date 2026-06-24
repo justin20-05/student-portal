@@ -53,6 +53,10 @@ export default function StudentDashboard() {
 
   const isPasswordFullyValid = Object.values(passwordValidations).every(Boolean);
 
+  const newPasswordLength = newPassword.length;
+  const lengthPercent = Math.min(100, Math.round((newPasswordLength / 12) * 100));
+  const lengthColorClass = newPasswordLength >= 12 ? 'bg-emerald-500' : 'bg-amber-400';
+
   // Live 1-Minute Session Timer Logic
   useEffect(() => {
     let intervalTimer;
@@ -325,6 +329,14 @@ export default function StudentDashboard() {
                   <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-3 text-[10px] font-bold text-slate-600 uppercase">
                     {showNewPassword ? 'Hide' : 'Show'}
                   </button>
+                </div>
+
+                {/* Live length progress bar */}
+                <div className="mt-3">
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className={`${lengthColorClass} h-2`} style={{ width: `${lengthPercent}%` }} />
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-2 text-right font-mono font-bold">{newPasswordLength} / 12 chars</div>
                 </div>
                 
                 {/* Live Validating Password Guidelines */}

@@ -17,9 +17,12 @@ export default function AdminPanel() {
   const [showMfaActivatedModal, setShowMfaActivatedModal] = useState(false);
   const [showMfaDeactivatedModal, setShowMfaDeactivatedModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const fetchSecurityLogs = async () => {
     setError('');
+    setCurrentPage(1);
     try {
       const response = await api.get('/admin/logs');
       setLogs(response.data.logs || []);
@@ -121,6 +124,12 @@ export default function AdminPanel() {
 
   const getLogValue = (log, camelKey, snakeKey) => log[camelKey] ?? log[snakeKey] ?? '';
 
+  // Pagination calculations
+  const totalPages = Math.ceil(logs.length / pageSize);
+  const startIdx = (currentPage - 1) * pageSize;
+  const endIdx = startIdx + pageSize;
+  const paginatedLogs = logs.slice(startIdx, endIdx);
+
   // Derived stats
   const actionCounts = useMemo(() => {
     const counts = {};
@@ -219,7 +228,7 @@ export default function AdminPanel() {
           {/* Updated Log Out Button - Light red background with red text */}
           <button 
             onClick={() => setShowLogoutConfirm(true)} 
-            className="bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-900 text-xs font-bold px-4 py-2 rounded-lg transition border border-red-200 shadow-sm"
+            className="bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-900 text-xs font-bold px-4 py-2 rounded-lg transition border border-red-200 shadow-sm cursor-pointer"
           >
             Log Out
           </button>
@@ -298,7 +307,7 @@ export default function AdminPanel() {
             </div>
             <button 
               onClick={() => { setLoading(true); fetchSecurityLogs(); }}
-              className="self-start sm:self-center px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-md transition"
+              className="self-start sm:self-center px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
             >
               Refresh Event Matrix
             </button>
@@ -325,7 +334,7 @@ export default function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm font-medium text-slate-700">
-                  {logs.map((log) => (
+                  {paginatedLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-4 px-6 text-xs text-slate-500 font-mono font-medium">
                         {formatLogTimestamp(log)}
@@ -358,6 +367,49 @@ export default function AdminPanel() {
               </table>
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {logs.length > 0 && (
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="text-xs text-slate-600 font-medium">
+                Showing {startIdx + 1} to {Math.min(endIdx, logs.length)} of {logs.length} events
+              </div>
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} 
+                  disabled={currentPage === 1} 
+                  className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition"
+                >
+                  ← Prev
+                </button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }).map((_, i) => {
+                    const page = i + 1;
+                    return (
+                      <button 
+                        key={page} 
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                          currentPage === page 
+                            ? 'bg-red-600 text-white' 
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button 
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} 
+                  disabled={currentPage === totalPages} 
+                  className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
       </main>
@@ -422,8 +474,8 @@ export default function AdminPanel() {
             <h3 className="text-lg font-black text-slate-900 mb-2">Confirm Sign Out</h3>
             <p className="text-sm text-slate-600 mb-4">Are you sure you want to log out? You will need to sign in again to continue.</p>
             <div className="flex space-x-3 mt-4">
-              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2.5 text-xs font-bold bg-slate-200 text-slate-800 rounded-lg">Cancel</button>
-              <button onClick={() => { setShowLogoutConfirm(false); logout(); }} className="flex-1 py-2.5 text-xs font-bold bg-red-600 text-white rounded-lg">Sign Out</button>
+              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2.5 text-xs font-bold bg-slate-200 text-slate-800 rounded-lg cursor-pointer">Cancel</button>
+              <button onClick={() => { setShowLogoutConfirm(false); logout(); }} className="flex-1 py-2.5 text-xs font-bold bg-red-600 text-white rounded-lg cursor-pointer">Sign Out</button>
             </div>
           </div>
         </div>
