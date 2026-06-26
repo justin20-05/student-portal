@@ -19,6 +19,11 @@ async function authenticate(req, res, next) {
       return res.status(401).json({ error: 'Invalid or expired token.' });
     }
 
+    const { isTokenRevoked } = require('../utils/store');
+    if (isTokenRevoked(token)) {
+      return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+
     // Check session timeout
     if (Date.now() - decoded.issuedAt > SESSION_TIMEOUT_MS) {
       return res.status(401).json({ error: 'Session expired. Please log in again.', code: 'SESSION_EXPIRED' });

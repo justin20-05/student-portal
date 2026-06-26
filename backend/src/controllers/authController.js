@@ -10,6 +10,8 @@ const {
   users, mfaSecrets, pendingMfa,
   getLoginAttempts, incrementLoginAttempts, resetLoginAttempts,
   isLocked, getLockoutRemaining, MAX_ATTEMPTS,
+  getOtpAttempts, incrementOtpAttempts, resetOtpAttempts,
+  isOtpLocked, getOtpLockoutRemaining, OTP_MAX_ATTEMPTS,
 } = require('../utils/store');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
@@ -137,7 +139,18 @@ async function verifyMfa(req, res) {
   const pending = pendingMfa.get(tempToken);
   if (!pending || Date.now() > pending.expiresAt) {
     pendingMfa.delete(tempToken);
+    resetOtpAttempts(tempToken);
     return res.status(401).json({ error: 'MFA session expired. Please log in again.' });
+  }
+
+  if (isOtpLocked(tempToken)) {
+    const remaining = getOtpLockoutRemaining(tempToken);
+    await logActivity(null, 'MFA_LOCKED', { tempToken }, ip);
+    return res.status(429).json({
+      error: `Too many invalid OTP attempts. Try again in ${Math.ceil(remaining / 60)} minute(s).`,
+      locked: true,
+      remainingSeconds: remaining,
+    });
   }
 
   const user = await findUser(pending.email);
@@ -147,10 +160,25 @@ async function verifyMfa(req, res) {
   const isValid = authenticator.verify({ token: code, secret });
 
   if (!isValid) {
-    await logActivity(user.id, 'MFA_FAILED', {}, ip);
-    return res.status(401).json({ error: 'Invalid OTP code. Please try again.' });
+    const attempts = incrementOtpAttempts(tempToken);
+    const remaining = OTP_MAX_ATTEMPTS - attempts.count;
+    await logActivity(user.id, 'MFA_FAILED', { attempts: attempts.count }, ip);
+
+    if (remaining <= 0) {
+      return res.status(429).json({
+        error: `Too many invalid OTP attempts. Session locked for ${Math.ceil(getOtpLockoutRemaining(tempToken) / 60)} minute(s).`,
+        locked: true,
+        remainingSeconds: getOtpLockoutRemaining(tempToken),
+      });
+    }
+
+    return res.status(401).json({
+      error: `Invalid OTP code. ${remaining} attempt(s) remaining.`,
+      attemptsRemaining: remaining,
+    });
   }
 
+  resetOtpAttempts(tempToken);
   pendingMfa.delete(tempToken);
   const token = generateToken(user);
   await logActivity(user.id, 'MFA_SUCCESS', { role: user.role }, ip);
@@ -241,6 +269,11 @@ async function disableMfa(req, res) {
 // POST /api/auth/logout
 async function logout(req, res) {
   if (req.user) {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      const { revokeToken } = require('../utils/store');
+      revokeToken(token);
+    }
     await logActivity(req.user.id, 'LOGOUT', {});
   }
   req.session.destroy();

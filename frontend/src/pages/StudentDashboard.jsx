@@ -203,7 +203,7 @@ export default function StudentDashboard() {
             <p className="text-sm font-bold text-slate-800">{user?.name || 'Loading Student...'}</p>
             <p className="text-xs text-red-600 font-bold capitalize">{user?.role} Access Mode</p>
           </div>
-          <button onClick={() => setShowLogoutConfirm(true)} className="bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-900 text-xs font-bold px-4 py-2 rounded-lg transition border border-red-200 shadow-sm">
+          <button onClick={() => setShowLogoutConfirm(true)} className="bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-900 text-xs font-bold px-4 py-2 rounded-lg transition border border-red-200 shadow-sm cursor-pointer">
             Log Out
           </button>
         </div>
@@ -246,7 +246,7 @@ export default function StudentDashboard() {
               </button>
             </div>
 
-            <button onClick={() => { setError(''); setSuccess(''); setShowPasswordModal(true); }} className="w-full py-2.5 text-center bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition shadow-md">
+            <button onClick={() => { setError(''); setSuccess(''); setShowPasswordModal(true); }} className="w-full py-2.5 text-center bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition shadow-md cursor-pointer">
               Modify Account Password
             </button>
           </div>

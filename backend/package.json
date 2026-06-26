@@ -4,7 +4,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -25,6 +26,8 @@
     "xss": "^1.0.14"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.2.2",
     "nodemon": "^3.1.14"
   }
 }

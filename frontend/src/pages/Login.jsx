@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import logo from '../assets/Logo.jpg';
-import background from '../assets/Background.jpg'; // Import the background image
+import background from '../assets/Background.jpg'; 
 
 export default function Login() {
   const { setUser } = useAuth();
