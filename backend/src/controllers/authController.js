@@ -249,8 +249,29 @@ async function confirmMfa(req, res) {
 
 // POST /api/auth/disable-mfa
 async function disableMfa(req, res) {
+  const { code } = req.body;
   const userId = req.user.id;
   const userEmail = req.user.email;
+
+  if (!code) {
+    return res.status(400).json({ error: 'MFA code is required to disable MFA.' });
+  }
+
+  const user = await findUser(userEmail);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  const secret = supabase ? user.mfa_secret : user.mfaSecret;
+  if (!secret) {
+    return res.status(400).json({ error: 'MFA is not configured for this account.' });
+  }
+
+  const isValid = authenticator.verify({ token: code, secret });
+  if (!isValid) {
+    await logActivity(userId, 'MFA_DISABLE_FAILED', { reason: 'Invalid OTP code' });
+    return res.status(401).json({ error: 'Invalid MFA code. MFA was not disabled.' });
+  }
 
   if (supabase) {
     await supabase.from('users').update({ mfa_enabled: false }).eq('id', userId);

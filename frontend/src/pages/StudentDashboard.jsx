@@ -22,9 +22,11 @@ export default function StudentDashboard() {
   const [mfaSetupSecret, setMfaSetupSecret] = useState('');
   const [mfaVerificationCode, setMfaVerificationCode] = useState('');
   const [isMfaActive, setIsMfaActive] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showMfaActivatedModal, setShowMfaActivatedModal] = useState(false);
   const [showMfaDeactivatedModal, setShowMfaDeactivatedModal] = useState(false);
+  const [showMfaDisableConfirm, setShowMfaDisableConfirm] = useState(false);
+  const [mfaDisableCode, setMfaDisableCode] = useState('');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Password Verification Logic State
   const [passwordValidations, setPasswordValidations] = useState({
@@ -163,21 +165,41 @@ export default function StudentDashboard() {
     setSuccess('');
 
     if (isMfaActive) {
-      // Disable MFA on the server and update local state/token
-      try {
-        const response = await api.post('/auth/disable-mfa');
-        if (response.data.token) {
-          localStorage.setItem('token', response.data.token);
-        }
-        setIsMfaActive(false);
-        setUser(prev => ({ ...(prev || {}), mfaEnabled: false }));
-        setSuccess(response.data.message || 'MFA disabled.');
-        setShowMfaDeactivatedModal(true);
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to disable MFA.');
-      }
+      setShowMfaDisableConfirm(true);
     } else {
       initiateMfaEnrollment();
+    }
+  };
+
+  const confirmMfaDisable = async (e) => {
+    e?.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!mfaDisableCode || mfaDisableCode.length !== 6) {
+      setError('Enter a valid 6-digit authenticator code.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/disable-mfa', { code: mfaDisableCode });
+      const payload = response.data || {};
+
+      if (payload.error || !payload.token) {
+        throw new Error(payload.error || 'Invalid MFA code.');
+      }
+
+      localStorage.setItem('token', payload.token);
+      setIsMfaActive(false);
+      setUser(prev => ({ ...(prev || {}), mfaEnabled: false }));
+      setMfaDisableCode('');
+      setShowMfaDisableConfirm(false);
+      setShowMfaDeactivatedModal(true);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Invalid MFA code.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -391,16 +413,35 @@ export default function StudentDashboard() {
         </div>
       )}
 
+      {/* MFA DISABLE CONFIRMATION MODAL */}
+      {showMfaDisableConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl p-6 border border-slate-200">
+            <h3 className="text-lg font-black text-slate-900 mb-2">Disable Multi-Factor Authentication</h3>
+            <p className="text-sm text-slate-600 mb-5">Enter your authenticator code to confirm disabling MFA for this account.</p>
+            {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 font-bold mb-4">{error}</div>}
+            <form onSubmit={confirmMfaDisable} className="space-y-4">
+              <input type="text" maxLength="6" placeholder="000000" value={mfaDisableCode} onChange={(e) => setMfaDisableCode(e.target.value.replace(/\D/g, ''))} className="w-full text-center text-2xl font-mono font-bold border border-slate-300 text-slate-900 tracking-widest py-3 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-600 transition" required />
+              <div className="flex space-x-3">
+                <button type="button" onClick={() => {setShowMfaDisableConfirm(false); setMfaDisableCode(''); setError('');}} className="flex-1 py-3 text-xs font-bold bg-slate-200 text-slate-800 rounded-xl hover:bg-slate-300 transition">Cancel</button>
+                <button type="submit" disabled={loading} className="flex-1 py-3 text-xs font-bold bg-red-600 text-white rounded-xl hover:bg-red-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed">Confirm Disable</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MFA ACTIVATED MODAL */}
       {showMfaActivatedModal && (
-        <div className="fixed inset-0 bg-slate-900/40 flex items-end justify-center p-6 z-50">
-          <div className="bg-emerald-600 text-white max-w-sm w-full rounded-2xl shadow-2xl p-4 border border-emerald-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-bold">Multi-Factor Activated</h4>
-                <p className="text-[13px] opacity-90">Your account now requires an authenticator code for future sign-ins.</p>
+        <div className="fixed inset-0 bg-slate-900/40 flex items-start justify-center p-6 z-50 pt-20">
+          <div className="bg-emerald-600 text-white max-w-xs w-full rounded-xl shadow-xl p-4 border border-emerald-500 backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl mt-0.5">✓</div>
+              <div className="flex-1">
+                <h4 className="text-base font-black tracking-tight mb-1">Multi-Factor Activated</h4>
+                <p className="text-xs leading-relaxed opacity-95 mb-3">Your account now requires an authenticator code for future sign-ins.</p>
+                <button onClick={() => setShowMfaActivatedModal(false)} className="w-full py-2 px-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition duration-200 text-xs uppercase tracking-wide cursor-pointer">Got It</button>
               </div>
-              <button onClick={() => setShowMfaActivatedModal(false)} className="ml-4 text-sm font-bold uppercase opacity-90">Dismiss</button>
             </div>
           </div>
         </div>
@@ -408,14 +449,15 @@ export default function StudentDashboard() {
 
       {/* MFA DEACTIVATED MODAL */}
       {showMfaDeactivatedModal && (
-        <div className="fixed inset-0 bg-slate-900/40 flex items-end justify-center p-6 z-50">
-          <div className="bg-red-600 text-white max-w-sm w-full rounded-2xl shadow-2xl p-4 border border-red-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-bold">Multi-Factor Disabled</h4>
-                <p className="text-[13px] opacity-90">MFA has been turned off for your account. Consider re-enabling for added security.</p>
+        <div className="fixed inset-0 bg-slate-900/40 flex items-start justify-center p-6 z-50 pt-20">
+          <div className="bg-red-600 text-white max-w-xs w-full rounded-xl shadow-xl p-4 border border-red-500 backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl mt-0.5">⚠</div>
+              <div className="flex-1">
+                <h4 className="text-base font-black tracking-tight mb-1">Multi-Factor Disabled</h4>
+                <p className="text-xs leading-relaxed opacity-95 mb-3">MFA has been turned off for your account. Consider re-enabling for added security.</p>
+                <button onClick={() => setShowMfaDeactivatedModal(false)} className="w-full py-2 px-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition duration-200 text-xs uppercase tracking-wide cursor-pointer">Dismiss</button>
               </div>
-              <button onClick={() => setShowMfaDeactivatedModal(false)} className="ml-4 text-sm font-bold uppercase opacity-90">Dismiss</button>
             </div>
           </div>
         </div>

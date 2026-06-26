@@ -139,6 +139,26 @@ describe('Security test checklist', () => {
     expect(res.body.user.password).toBeUndefined();
   });
 
+  it('rejects invalid disable-mfa codes and preserves MFA state', async () => {
+    const loginRes = await postAuth({ email: mfaEmail, password: mfaPassword });
+    expect(loginRes.body.requiresMfa).toBe(true);
+
+    const validCode = authenticator.generate(users.get(mfaEmail).mfaSecret);
+    const verifyRes = await postVerifyMfa({ tempToken: loginRes.body.tempToken, code: validCode });
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.token).toBeDefined();
+
+    const disableRes = await agent
+      .post('/api/auth/disable-mfa')
+      .set('Authorization', `Bearer ${verifyRes.body.token}`)
+      .set('x-csrf-token', csrfToken)
+      .send({ code: '000000' });
+
+    expect(disableRes.status).toBe(401);
+    expect(disableRes.body.error).toMatch(/Invalid MFA code/);
+    expect(users.get(mfaEmail).mfaEnabled).toBe(true);
+  });
+
   it('requires MFA to complete login and does not expose OTP values', async () => {
     const loginRes = await postAuth({ email: mfaEmail, password: mfaPassword });
     expect(loginRes.status).toBe(200);

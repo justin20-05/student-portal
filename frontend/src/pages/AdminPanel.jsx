@@ -7,6 +7,7 @@ export default function AdminPanel() {
   const { user, logout, setUser } = useAuth();
   const [logs, setLogs] = useState([]);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
   // MFA states
   const [showMfaModal, setShowMfaModal] = useState(false);
@@ -16,9 +17,65 @@ export default function AdminPanel() {
   const [isMfaActive, setIsMfaActive] = useState(false);
   const [showMfaActivatedModal, setShowMfaActivatedModal] = useState(false);
   const [showMfaDeactivatedModal, setShowMfaDeactivatedModal] = useState(false);
+  const [showMfaDisableConfirm, setShowMfaDisableConfirm] = useState(false);
+  const [mfaDisableCode, setMfaDisableCode] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  // Password management states
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordValidations, setPasswordValidations] = useState({
+    length: false,
+    upper: false,
+    lower: false,
+    number: false,
+    special: false
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+
+  const handleNewPasswordChange = (e) => {
+    const val = e.target.value;
+    setNewPassword(val);
+    setPasswordValidations({
+      length: val.length >= 12,
+      upper: /[A-Z]/.test(val),
+      lower: /[a-z]/.test(val),
+      number: /[0-9]/.test(val),
+      special: /[!@#$%^&*]/.test(val)
+    });
+  };
+
+  const isPasswordFullyValid = Object.values(passwordValidations).every(Boolean);
+
+  const newPasswordLength = newPassword.length;
+  const lengthPercent = Math.min(100, Math.round((newPasswordLength / 12) * 100));
+  const lengthColorClass = newPasswordLength >= 12 ? 'bg-emerald-500' : 'bg-amber-400';
+
+  const handleChangePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!isPasswordFullyValid) return; // Failsafe
+    
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const response = await api.post('/auth/change-password', { currentPassword, newPassword });
+      setSuccess(response.data.message || 'Password changed successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setTimeout(() => setShowPasswordModal(false), 2000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update credentials. Please match policy rules.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchSecurityLogs = async () => {
     setError('');
@@ -77,22 +134,29 @@ export default function AdminPanel() {
 
   const handleMfaToggle = async () => {
     setError('');
-    setLoading(true);
     if (isMfaActive) {
-      try {
-        const response = await api.post('/auth/disable-mfa');
-        if (response.data.token) localStorage.setItem('token', response.data.token);
-        setIsMfaActive(false);
-        setUser(prev => ({ ...(prev || {}), mfaEnabled: false }));
-        setShowMfaDeactivatedModal(true);
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to disable MFA.');
-      } finally {
-        setLoading(false);
-      }
+      setShowMfaDisableConfirm(true);
     } else {
-      setLoading(false);
       initiateMfaEnrollment();
+    }
+  };
+
+  const confirmMfaDisable = async (e) => {
+    e?.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/disable-mfa', { code: mfaDisableCode });
+      if (response.data.token) localStorage.setItem('token', response.data.token);
+      setIsMfaActive(false);
+      setUser(prev => ({ ...(prev || {}), mfaEnabled: false }));
+      setMfaDisableCode('');
+      setShowMfaDisableConfirm(false);
+      setShowMfaDeactivatedModal(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid MFA code.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -251,13 +315,16 @@ export default function AdminPanel() {
                 <p className="text-xs text-slate-500">{isMfaActive ? 'Enabled' : 'Disabled'}</p>
               </div>
               <button onClick={handleMfaToggle} className={`relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isMfaActive ? 'bg-red-600' : 'bg-slate-300'}`}>
-                <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${isMfaActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                <span className={`pointer-events-none inline-block h-7.5 w-8 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${isMfaActive ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
           </div>
           <div className="mt-4">
             <p className="text-sm text-slate-600">Use the toggle to enable or disable MFA for this admin account. Enabling will require scanning a QR code with an authenticator app.</p>
           </div>
+          <button onClick={() => { setError(''); setSuccess(''); setShowPasswordModal(true); }} className="w-full mt-4 py-2.5 text-center bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition shadow-md cursor-pointer">
+            Modify Account Password
+          </button>
         </div>
         
         {/* Summary Cards & Charts */}
@@ -292,7 +359,7 @@ export default function AdminPanel() {
         </div>
 
         {/* Error Alert Display Block */}
-        {error && (
+        {error && !showMfaModal && !showMfaDisableConfirm && (
           <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg text-sm text-red-800 font-bold shadow-sm">
             {error}
           </div>
@@ -427,12 +494,16 @@ export default function AdminPanel() {
             <div className="text-left bg-slate-50 p-3 rounded-lg border border-slate-200 text-[10px] font-mono text-center font-bold text-slate-800 break-all select-all mb-5 shadow-sm">
               Secret Key: {mfaSetupSecret}
             </div>
-
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 font-bold">
+                {error}
+              </div>
+            )}
             <form onSubmit={confirmMfaEnrollment} className="space-y-4">
               <input type="text" maxLength="6" placeholder="000000" value={mfaVerificationCode} onChange={(e) => setMfaVerificationCode(e.target.value.replace(/\D/g, ''))} className="w-full text-center text-2xl font-mono font-bold border border-slate-300 text-slate-900 tracking-widest py-3 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-600 transition" required />
               <div className="flex space-x-3 mt-2">
-                <button type="button" onClick={() => {setShowMfaModal(false); setIsMfaActive(false);}} className="flex-1 py-3 text-xs font-bold bg-slate-200 text-slate-800 rounded-xl hover:bg-slate-300 transition">Dismiss</button>
-                <button type="submit" className="flex-1 py-3 text-xs font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition shadow-md">Activate Protection</button>
+                <button type="button" onClick={() => {setShowMfaModal(false); setIsMfaActive(false); setError('');}} className="flex-1 py-3 text-xs font-bold bg-slate-200 text-slate-800 rounded-xl hover:bg-slate-300 transition cursor-pointer">Dismiss</button>
+                <button type="submit" className="flex-1 py-3 text-xs font-bold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition shadow-md cursor-pointer">Activate Protection</button>
               </div>
             </form>
           </div>
@@ -440,28 +511,47 @@ export default function AdminPanel() {
       )}
 
       {showMfaActivatedModal && (
-        <div className="fixed inset-0 bg-slate-900/40 flex items-end justify-center p-6 z-50">
-          <div className="bg-emerald-600 text-white max-w-sm w-full rounded-2xl shadow-2xl p-4 border border-emerald-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-bold">Multi-Factor Activated</h4>
-                <p className="text-[13px] opacity-90">Your account now requires an authenticator code for future sign-ins.</p>
+        <div className="fixed inset-0 bg-slate-900/40 flex items-start justify-center p-6 z-50 pt-20">
+          <div className="bg-emerald-600 text-white max-w-xs w-full rounded-xl shadow-xl p-4 border border-emerald-500 backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl mt-0.5">✓</div>
+              <div className="flex-1">
+                <h4 className="text-base font-black tracking-tight mb-1">Multi-Factor Activated</h4>
+                <p className="text-xs leading-relaxed opacity-95 mb-3">Your account now requires an authenticator code for future sign-ins.</p>
+                <button onClick={() => setShowMfaActivatedModal(false)} className="w-full py-2 px-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition duration-200 text-xs uppercase tracking-wide cursor-pointer">Got It</button>
               </div>
-              <button onClick={() => setShowMfaActivatedModal(false)} className="ml-4 text-sm font-bold uppercase opacity-90">Dismiss</button>
             </div>
           </div>
         </div>
       )}
 
-      {showMfaDeactivatedModal && (
-        <div className="fixed inset-0 bg-slate-900/40 flex items-end justify-center p-6 z-50">
-          <div className="bg-red-600 text-white max-w-sm w-full rounded-2xl shadow-2xl p-4 border border-red-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-bold">Multi-Factor Disabled</h4>
-                <p className="text-[13px] opacity-90">MFA has been turned off for your account. Consider re-enabling for added security.</p>
+      {showMfaDisableConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl p-6 border border-slate-200">
+            <h3 className="text-lg font-black text-slate-900 mb-2">Disable Multi-Factor Authentication</h3>
+            <p className="text-sm text-slate-600 mb-5">Enter your authenticator code to confirm disabling MFA for this account.</p>
+            {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 font-bold mb-4">{error}</div>}
+            <form onSubmit={confirmMfaDisable} className="space-y-4">
+              <input type="text" maxLength="6" placeholder="000000" value={mfaDisableCode} onChange={(e) => setMfaDisableCode(e.target.value.replace(/\D/g, ''))} className="w-full text-center text-2xl font-mono font-bold border border-slate-300 text-slate-900 tracking-widest py-3 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-600 transition" required />
+              <div className="flex space-x-3">
+                <button type="button" onClick={() => {setShowMfaDisableConfirm(false); setMfaDisableCode(''); setError('');}} className="flex-1 py-3 text-xs font-bold bg-slate-200 text-slate-800 rounded-xl hover:bg-slate-300 transition cursor-pointer">Cancel</button>
+                <button type="submit" disabled={loading} className="flex-1 py-3 text-xs font-bold bg-red-600 text-white rounded-xl hover:bg-red-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">Confirm Disable</button>
               </div>
-              <button onClick={() => setShowMfaDeactivatedModal(false)} className="ml-4 text-sm font-bold uppercase opacity-90">Dismiss</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showMfaDeactivatedModal && (
+        <div className="fixed inset-0 bg-slate-900/40 flex items-start justify-center p-6 z-50 pt-20">
+          <div className="bg-red-600 text-white max-w-xs w-full rounded-xl shadow-xl p-4 border border-red-500 backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl mt-0.5">⚠</div>
+              <div className="flex-1">
+                <h4 className="text-base font-black tracking-tight mb-1">Multi-Factor Disabled</h4>
+                <p className="text-xs leading-relaxed opacity-95 mb-3">MFA has been turned off for your account. Consider re-enabling for added security.</p>
+                <button onClick={() => setShowMfaDeactivatedModal(false)} className="w-full py-2 px-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition duration-200 text-xs uppercase tracking-wide cursor-pointer">Dismiss</button>
+              </div>
             </div>
           </div>
         </div>
@@ -477,6 +567,93 @@ export default function AdminPanel() {
               <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2.5 text-xs font-bold bg-slate-200 text-slate-800 rounded-lg cursor-pointer">Cancel</button>
               <button onClick={() => { setShowLogoutConfirm(false); logout(); }} className="flex-1 py-2.5 text-xs font-bold bg-red-600 text-white rounded-lg cursor-pointer">Sign Out</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Password Enforcement Update Window */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl p-6 border border-slate-200">
+            <h3 className="text-lg font-black text-slate-900 mb-4">Enforce Password Modification</h3>
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">Current Active Password</label>
+                <div className="relative">
+                  <input 
+                    type={showCurrentPassword ? "text" : "password"} 
+                    value={currentPassword} 
+                    onChange={(e) => setCurrentPassword(e.target.value)} 
+                    className="w-full px-3 py-2.5 pr-16 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-red-600 text-slate-900 bg-slate-50" 
+                    required 
+                  />
+                  <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-3 top-3 text-[10px] font-bold text-slate-600 uppercase">
+                    {showCurrentPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">New Complex Password</label>
+                <div className="relative">
+                  <input 
+                    type={showNewPassword ? "text" : "password"} 
+                    value={newPassword} 
+                    onChange={handleNewPasswordChange} 
+                    className="w-full px-3 py-2.5 pr-16 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-red-600 text-slate-900 bg-slate-50" 
+                    required 
+                  />
+                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-3 text-[10px] font-bold text-slate-600 uppercase">
+                    {showNewPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+
+                {/* Live length progress bar */}
+                <div className="mt-3">
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className={`${lengthColorClass} h-2`} style={{ width: `${lengthPercent}%` }} />
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-2 text-right font-mono font-bold">{newPasswordLength} / 12 chars</div>
+                </div>
+                
+                {/* Live Validating Password Guidelines */}
+                <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg shadow-inner">
+                  <p className="text-[11px] font-bold text-slate-800 mb-1.5">Password Requirements Setup:</p>
+                  <ul className="text-[10px] font-bold space-y-1">
+                    <li className={`flex items-center space-x-1.5 ${passwordValidations.length ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      <span>{passwordValidations.length ? '✓' : '○'}</span> <span>Minimum of 12 characters</span>
+                    </li>
+                    <li className={`flex items-center space-x-1.5 ${passwordValidations.upper ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      <span>{passwordValidations.upper ? '✓' : '○'}</span> <span>At least one uppercase letter (A-Z)</span>
+                    </li>
+                    <li className={`flex items-center space-x-1.5 ${passwordValidations.lower ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      <span>{passwordValidations.lower ? '✓' : '○'}</span> <span>At least one lowercase letter (a-z)</span>
+                    </li>
+                    <li className={`flex items-center space-x-1.5 ${passwordValidations.number ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      <span>{passwordValidations.number ? '✓' : '○'}</span> <span>At least one numeric digit (0-9)</span>
+                    </li>
+                    <li className={`flex items-center space-x-1.5 ${passwordValidations.special ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      <span>{passwordValidations.special ? '✓' : '○'}</span> <span>At least one special character (!@#$%^&*)</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 font-bold">{error}</div>}
+              {success && <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800 font-bold">{success}</div>}
+
+              <div className="flex space-x-3 pt-4">
+                <button type="button" onClick={() => setShowPasswordModal(false)} className="flex-1 py-2.5 text-center text-xs font-bold bg-slate-200 hover:bg-slate-300 rounded-lg text-slate-800 transition">Cancel</button>
+                <button 
+                  type="submit" 
+                  disabled={loading || !isPasswordFullyValid} 
+                  className="flex-1 py-2.5 text-center text-xs font-bold bg-red-600 hover:bg-red-700 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md"
+                >
+                  Save Password
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
